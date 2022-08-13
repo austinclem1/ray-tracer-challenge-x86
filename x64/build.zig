@@ -23,7 +23,6 @@ pub fn build(b: *std.build.Builder) void {
     {
         exe.step.dependOn(&nasm_cmd.step);
         exe.addObjectFile("obj/lib.o");
-        exe.addObjectFile("func.o");
 
         exe.linkLibC();
 

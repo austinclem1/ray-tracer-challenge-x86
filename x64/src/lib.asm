@@ -3,12 +3,19 @@ default rel
 section .data
 global epsilon
 
+fmt_str: db "Hi %d %d", 10, 0
+
 epsilon: dd 1.19209289e-07
 neg1_sse: times 4 dd -1.0
 
+ppm_header_fmt: db "P3", 10, "%d %d", 10, "255", 10, 0
+ppm_pixel_fmt: db "%d %d %d ", 0
+
 section .text
 extern malloc
+extern free
 extern printf
+extern putchar
 
 global equV4
 equV4:
@@ -97,7 +104,9 @@ global normV4
 normV4:
     movups xmm2, xmm0
     movups xmm3, xmm1
+    push rbx
     call magV4
+    pop rbx
     movd edi, xmm0
     mov rsi, rdi
     shl rsi, 32
@@ -186,7 +195,7 @@ createCanvas:
     xor rdx, rdx
     mul qword [rdi + 8]
     xor rdx, rdx
-    mov rcx, 3
+    mov rcx, 12
     mul rcx
     push rdi
     mov rdi, rax
@@ -195,14 +204,188 @@ createCanvas:
     mov qword [rdi + 16], rax
     ret
 
+global destroyCanvas:
+destroyCanvas:
+    mov rdi, [rdi + 16]
+    push rbx
+    call free
+    pop rbx
+    ret
+
+global fillCanvas:
+fillCanvas:
+    mov rax, qword [rdi]
+    mov rcx, qword [rdi + 8]
+    mov rdi, qword [rdi + 16]
+    xor rdx, rdx
+    mul rcx
+    mov rcx, 12
+    xor rdx, rdx
+    mul rcx
+    add rax, rdi
+.loop_start:
+    cmp rdi, rax
+    jae .loop_end
+
+    movq [rdi], xmm0
+    movd [rdi + 8], xmm1
+
+    add rdi, 12
+    jmp .loop_start
+.loop_end:
+    ret
+
 global doPrint
 doPrint:
     lea rdi, [fmt_str]
     mov rsi, 5
-    call printf wrt ..plt
+    mov rdx, 4
+    push rbx
+    call printf
+    pop rbx
     ret
 
-; global printCanvasPPM
-; printCanvasPPM:
-    
-;     ret
+global printCanvasPPM
+printCanvasPPM:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 48
+    mov rsi, [rdi]
+    mov rdx, [rdi + 8]
+    mov rcx, [rdi + 16]
+    mov [rsp], rsi
+    mov [rsp + 8], rdx
+    mov [rsp + 16], rcx
+    lea rdi, [ppm_header_fmt]
+    call printf
+
+    mov rax, [rsp]
+    mov rcx, 12
+    xor rdx, rdx
+    mul rcx
+    mov [rsp + 24], rax ; pixel row stride in bytes
+    mov rcx, [rsp + 8]
+    xor rdx, rdx
+    mul rcx
+    mov [rsp + 32], rax ; entire pixel data size in bytes
+
+    xor r8, r8
+.pixel_row_loop:
+    mov r9, [rsp + 32]
+    cmp r8, r9
+    jae .pixel_row_loop_end
+
+    mov r9, r8
+    add r9, [rsp + 24]
+    .pixel_col_loop:
+        cmp r8, r9
+        jae .pixel_col_loop_end
+
+        mov eax, __float32__(0.0)
+        movd xmm1, eax
+        mov eax, __float32__(1.0)
+        movd xmm2, eax
+        mov eax, __float32__(255.0)
+        movd xmm3, eax
+
+        mov rax, [rsp + 16]
+        movd xmm0, [rax + r8]
+        maxss xmm0, xmm1
+        minss xmm0, xmm2
+        mulss xmm0, xmm3
+        cvtss2si rsi, xmm0
+        movd xmm0, [rax + r8 + 4]
+        maxss xmm0, xmm1
+        minss xmm0, xmm2
+        mulss xmm0, xmm3
+        cvtss2si rdx, xmm0
+        movd xmm0, [rax + r8 + 8]
+        maxss xmm0, xmm1
+        minss xmm0, xmm2
+        mulss xmm0, xmm3
+        cvtss2si rcx, xmm0
+
+        push r8
+        push r9
+        lea rdi, [ppm_pixel_fmt]
+        call printf
+        pop r9
+        pop r8
+
+        add r8, 12
+        jmp .pixel_col_loop
+
+    .pixel_col_loop_end:
+
+        mov rdi, 10
+        push r8
+        push r8
+        call putchar
+        pop r8
+        pop r8
+
+        jmp .pixel_row_loop
+
+.pixel_row_loop_end:
+
+    add rsp, 48
+    pop rbp
+    ret
+
+global doSim
+doSim:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 80
+
+    lea rax, [env]
+    movups xmm0, [rax]
+    movups [rsp], xmm0
+    lea rax, [proj]
+    movups xmm0, [rax]
+    movups [rsp + 16], xmm0
+    movups xmm0, [rax + 16]
+    movups [rsp + 32], xmm0
+    lea rdi, [rsp + 48]
+    mov rsi, 60
+    mov rdx, 80
+    call createCanvas
+
+    lea rax, [black]
+    movq xmm0, [rax]
+    movd xmm1, [rax + 8]
+    lea rdi, [rsp + 48]
+    call fillCanvas
+
+    lea rax, [white]
+    movq xmm0, [rax]
+    movd xmm1, [rax + 8]
+    lea rdi, [rsp + 48]
+    mov rsi, 0
+    mov rdx, 0
+    call writePixel
+    lea rax, [white]
+    movq xmm0, [rax]
+    movd xmm1, [rax + 8]
+    lea rdi, [rsp + 48]
+    mov rsi, 1
+    mov rdx, 0
+    call writePixel
+
+    lea rdi, [rsp + 48]
+    call printCanvasPPM
+
+    lea rdi, [rsp + 48]
+    call destroyCanvas
+
+    add rsp, 80
+    pop rbp
+    ret
+
+section .data
+env: dd 0.0, 0.0, 0.0, 0.0
+proj:
+    dd 0.0, 1.0, 0.0, 0.0 ; position
+    dd 1.0, 1.0, 0.0, 0.0 ; velocity
+white: dd 1.0, 1.0, 1.0
+black: dd 0.0, 0.0, 0.0

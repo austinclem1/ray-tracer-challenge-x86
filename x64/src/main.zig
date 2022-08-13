@@ -27,9 +27,12 @@ extern fn normV4(v: V4) V4;
 extern fn dotV4(a: V4, b: V4) f32;
 extern fn cross(a: V4, b: V4) V4;
 extern fn createCanvas(width: usize, height: usize) Canvas;
-extern fn writePixel(canvas: *Canvas, x: usize, y: usize, color: V3) void;
+extern fn destroyCanvas(canvas: *Canvas) void;
+extern fn writePixel(canvas: *Canvas, x: isize, y: isize, color: V3) void;
+extern fn printCanvasPPM(canvas: *Canvas) void;
 
 extern fn doPrint() void;
+extern fn doSim() void;
 
 const V4 = extern struct {
     x: f32,
@@ -49,52 +52,48 @@ const Projectile = struct {
 };
 
 pub fn main() void {
-    const env = Environment{
-        .wind = V4{
-            .x = 1.0,
-            .y = 0.0,
-            .z = 1.0,
-            .w = 0.0,
-        },
-        .gravity = V4{
-            .x = 0.0,
-            .y = -0.1,
-            .z = 0.0,
-            .w = 0.0,
-        },
-    };
+    doSim();
+    // const env = Environment{
+    //     .wind = V4{
+    //         .x = 0.0,
+    //         .y = 0.0,
+    //         .z = 0.0,
+    //         .w = 0.0,
+    //     },
+    //     .gravity = V4{
+    //         .x = 0.0,
+    //         .y = -0.1,
+    //         .z = 0.0,
+    //         .w = 0.0,
+    //     },
+    // };
 
-    var proj = Projectile{
-        .position = V4{
-            .x = 0.0,
-            .y = 10.0,
-            .z = 0.0,
-            .w = 0.0,
-        },
-        .velocity = V4{
-            .x = 0.0,
-            .y = 3.0,
-            .z = 1.0,
-            .w = 0.0,
-        },
-    };
+    // var proj = Projectile{
+    //     .position = V4{
+    //         .x = 0.0,
+    //         .y = 10.0,
+    //         .z = 0.0,
+    //         .w = 0.0,
+    //     },
+    //     .velocity = V4{
+    //         .x = 1.0,
+    //         .y = 3.0,
+    //         .z = 0.0,
+    //         .w = 0.0,
+    //     },
+    // };
 
-    var canvas = createCanvas(5, 5);
-    writePixel(&canvas, 0, 0, V3{ .r = 1, .g = 2, .b = 3 });
-    writePixel(&canvas, 1, 3, V3{ .r = 1, .g = 2, .b = 3 });
-    {
-        var i: usize = 0;
-        while (i < canvas.w * canvas.h) : (i += 1) {
-            std.debug.print("{} {}\n", .{ i, canvas.data[i] });
-        }
-    }
-    // std.debug.print("{}\n", .{canvas[0]});
-    std.debug.print("{}\n", .{canvas});
+    // var canvas = createCanvas(80, 60);
 
-    while (proj.position.y > 0.0) {
-        proj = tick(env, proj);
-        std.debug.print("{d:.6} {d:.6} {d:.6}\n", .{ proj.position.x, proj.position.y, proj.position.z });
-    }
+    // while (proj.position.y > 0.0) : (proj = tick(env, proj)) {
+    //     const white = V3{ .r = 1, .g = 1, .b = 1 };
+    //     const canvas_x = @floatToInt(isize, proj.position.x);
+    //     const canvas_y = canvas.w - @floatToInt(isize, proj.position.y);
+    //     writePixel(&canvas, canvas_x, canvas_y, white);
+    // }
+
+    // printCanvasPPM(&canvas);
+    // destroyCanvas(&canvas);
 }
 
 fn tick(env: Environment, proj: Projectile) Projectile {
