@@ -174,6 +174,16 @@ mulV3:
 
 global writePixel
 writePixel:
+    cmp rsi, 0
+    jl .end
+    cmp rdx, 0
+    jl .end
+    cmp rsi, qword [rdi]
+    jge .end
+    cmp rdx, qword [rdi + 8]
+    jge .end
+    mov rcx, [rdi]
+
     mov rax, rdx
     xor rdx, rdx
     mul qword [rdi]
@@ -185,6 +195,7 @@ writePixel:
     movq [rdi + rax * 4], xmm0
     add rdi, 8
     movss [rdi + rax * 4], xmm1
+.end:
     ret
 
 global createCanvas
@@ -357,20 +368,35 @@ doSim:
     lea rdi, [rsp + 48]
     call fillCanvas
 
+.tick_loop:
+    lea rax, [proj]
+    movd xmm0, [rax + 4]
+    mov eax, __float32__(0.0)
+    movd xmm1, eax
+    cmpltss xmm0, xmm1
+    movq rax, xmm0
+    test rax, rax
+    jnz .tick_loop_end
+
+    lea rdi, [proj]
+    call tick
+
+    lea rdi, [rsp + 48]
+    lea rax, [proj]
+    movd xmm0, [rax]
+    cvtss2si rsi, xmm0
+    movd xmm0, [rax + 4]
+    cvtss2si rax, xmm0
+    mov rdx, qword [rdi + 8]
+    sub rdx, rax
     lea rax, [white]
     movq xmm0, [rax]
     movd xmm1, [rax + 8]
-    lea rdi, [rsp + 48]
-    mov rsi, 0
-    mov rdx, 0
     call writePixel
-    lea rax, [white]
-    movq xmm0, [rax]
-    movd xmm1, [rax + 8]
-    lea rdi, [rsp + 48]
-    mov rsi, 1
-    mov rdx, 0
-    call writePixel
+
+    jmp .tick_loop
+
+.tick_loop_end:
 
     lea rdi, [rsp + 48]
     call printCanvasPPM
@@ -382,10 +408,26 @@ doSim:
     pop rbp
     ret
 
+tick:
+    lea rax, [time_factor]
+    movups xmm3, [rax]
+    movups xmm0, [rdi]
+    movups xmm1, [rdi + 16]
+    movups xmm2, [gravity]
+    mulps xmm2, xmm3
+    addps xmm1, xmm2
+    movups [rdi + 16], xmm1
+    mulps xmm1, xmm3
+    addps xmm0, xmm1
+    movups [rdi], xmm0
+    ret
+
 section .data
 env: dd 0.0, 0.0, 0.0, 0.0
+gravity: dd 0.0, -1.0, 0.0, 0.0
 proj:
-    dd 0.0, 1.0, 0.0, 0.0 ; position
-    dd 1.0, 1.0, 0.0, 0.0 ; velocity
+    dd 0.0, 0.0, 0.0, 0.0 ; position
+    dd 4.0, 10.0, 0.0, 0.0 ; velocity
 white: dd 1.0, 1.0, 1.0
 black: dd 0.0, 0.0, 0.0
+time_factor: times 4 dd 0.1
