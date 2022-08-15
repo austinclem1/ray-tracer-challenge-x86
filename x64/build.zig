@@ -11,20 +11,29 @@ pub fn build(b: *std.build.Builder) void {
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const mode = b.standardReleaseOptions();
 
-    const nasm_cmd = b.addSystemCommand(&[_][]const u8{
-        "nasm",
-        "-felf64",
-        "src/lib.asm",
-        "-o",
-        "obj/lib.o",
-    });
+    const lib = b.addStaticLibrary("lib", null);
+    {
+        const nasm_cmd = b.addSystemCommand(&[_][]const u8{
+            "nasm",
+            "-felf64",
+            "src/lib.asm",
+            "-o",
+            "obj/lib.o",
+        });
+
+        lib.step.dependOn(&nasm_cmd.step);
+        lib.addObjectFile("obj/lib.o");
+        lib.addObjectFile("other.o");
+        lib.linkLibC();
+    }
+
+    const emit_asm = b.option(bool, "emit-asm", "emit assembly") orelse false;
 
     const exe = b.addExecutable("x64", "src/main.zig");
     {
-        exe.step.dependOn(&nasm_cmd.step);
-        exe.addObjectFile("obj/lib.o");
+        exe.emit_asm = if (emit_asm) .emit else .default;
 
-        exe.linkLibC();
+        exe.linkLibrary(lib);
 
         exe.setTarget(target);
         exe.setBuildMode(mode);
@@ -34,8 +43,8 @@ pub fn build(b: *std.build.Builder) void {
     const test_step = b.step("test", "Runs the test suite");
     {
         const test_suite = b.addTest("src/tests.zig");
-        test_suite.step.dependOn(&nasm_cmd.step);
-        test_suite.addObjectFile("obj/lib.o");
+        test_suite.linkLibrary(lib);
+        test_suite.linkLibC();
 
         test_step.dependOn(&test_suite.step);
     }

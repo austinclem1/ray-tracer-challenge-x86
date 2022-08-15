@@ -41,47 +41,49 @@ const V4 = extern struct {
     w: f32,
 };
 
-const Environment = struct {
+const Environment = extern struct {
     wind: V4,
     gravity: V4,
 };
 
-const Projectile = struct {
+const Projectile = extern struct {
     position: V4,
     velocity: V4,
 };
 
 pub fn main() void {
     doSim();
-    // const env = Environment{
-    //     .wind = V4{
-    //         .x = 0.0,
-    //         .y = 0.0,
-    //         .z = 0.0,
-    //         .w = 0.0,
-    //     },
-    //     .gravity = V4{
-    //         .x = 0.0,
-    //         .y = -0.1,
-    //         .z = 0.0,
-    //         .w = 0.0,
-    //     },
-    // };
+    const env = Environment{
+        .wind = V4{
+            .x = 0.0,
+            .y = 0.0,
+            .z = 0.0,
+            .w = 0.0,
+        },
+        .gravity = V4{
+            .x = 0.0,
+            .y = -0.1,
+            .z = 0.0,
+            .w = 0.0,
+        },
+    };
 
-    // var proj = Projectile{
-    //     .position = V4{
-    //         .x = 0.0,
-    //         .y = 10.0,
-    //         .z = 0.0,
-    //         .w = 0.0,
-    //     },
-    //     .velocity = V4{
-    //         .x = 1.0,
-    //         .y = 3.0,
-    //         .z = 0.0,
-    //         .w = 0.0,
-    //     },
-    // };
+    var proj = Projectile{
+        .position = V4{
+            .x = 0.0,
+            .y = 10.0,
+            .z = 0.0,
+            .w = 0.0,
+        },
+        .velocity = V4{
+            .x = 1.0,
+            .y = 3.0,
+            .z = 0.0,
+            .w = 0.0,
+        },
+    };
+
+    proj = tick2(env, proj);
 
     // var canvas = createCanvas(80, 60);
 
@@ -96,7 +98,7 @@ pub fn main() void {
     // destroyCanvas(&canvas);
 }
 
-fn tick(env: Environment, proj: Projectile) Projectile {
+export fn tick2(env: Environment, proj: Projectile) Projectile {
     var newProj = proj;
     newProj.velocity = addV4(newProj.velocity, env.gravity);
     newProj.velocity = addV4(newProj.velocity, env.wind);

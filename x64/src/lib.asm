@@ -16,6 +16,7 @@ extern malloc
 extern free
 extern printf
 extern putchar
+extern printStructs
 
 global equV4
 equV4:
@@ -378,8 +379,20 @@ doSim:
     test rax, rax
     jnz .tick_loop_end
 
+    sub rsp, 64
+    lea rax, [env]
     lea rdi, [proj]
+    movups xmm0, [rax] ; wind
+    movups xmm1, [rax + 16] ; gravity
+    movups xmm2, [rdi] ; position
+    movups xmm3, [rdi + 16] ; velocity
+    movups [rsp + 48], xmm3
+    movups [rsp + 32], xmm2
+    movups [rsp + 16], xmm1
+    movups [rsp], xmm0
     call tick
+    call printStructs
+    add rsp, 64
 
     lea rdi, [rsp + 48]
     lea rax, [proj]
@@ -410,10 +423,10 @@ doSim:
 
 tick:
     lea rax, [time_factor]
-    movups xmm3, [rax]
-    movups xmm0, [rdi]
-    movups xmm1, [rdi + 16]
-    movups xmm2, [gravity]
+    movups xmm3, [rax] ; time_factor
+    movups xmm0, [rsp + 40] ; position
+    movups xmm1, [rsp + 56] ; velocity
+    movups xmm2, [rsp + 24] ; gravity
     mulps xmm2, xmm3
     addps xmm1, xmm2
     movups [rdi + 16], xmm1
@@ -423,8 +436,8 @@ tick:
     ret
 
 section .data
-env: dd 0.0, 0.0, 0.0, 0.0
-gravity: dd 0.0, -1.0, 0.0, 0.0
+env: dd 0.0, 0.0, 0.0, 0.0 ; wind
+     dd 0.0, -1.0, 0.0, 0.0 ; gravity
 proj:
     dd 0.0, 0.0, 0.0, 0.0 ; position
     dd 4.0, 10.0, 0.0, 0.0 ; velocity
