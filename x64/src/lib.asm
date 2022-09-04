@@ -1,11 +1,10 @@
 default rel
 
 section .data
-global epsilon
 
 fmt_str: db "Hi %d %d", 10, 0
 
-epsilon: dd 1.19209289e-07
+epsilon: times 4 dd 1.19209289e-07
 neg1_sse: times 4 dd -1.0
 
 ppm_header_fmt: db "P3", 10, "%d %d", 10, "255", 10, 0
@@ -20,20 +19,24 @@ extern printStructs
 
 global equV4
 equV4:
-    push rbp
-    mov rbp, rsp
-    sub rsp, 8
+    subps xmm0, xmm2
+    subps xmm1, xmm3
+    mov rax, ~((1 << 63) + (1 << 31))
+    movq xmm2, rax
+    pand xmm0, xmm2
+    pand xmm1, xmm2
 
-    cmpeqps xmm0, xmm2
-    cmpeqps xmm1, xmm3
+    lea rax, [epsilon]
+    movq xmm2, [rax]
+    cmpleps xmm0, xmm2
+    cmpleps xmm1, xmm2
     andps xmm0, xmm1
-    movq [rsp], xmm0
-    mov eax, [rsp]
-    mov edi, [rsp + 4]
-    and eax, edi
+    movups xmm1, xmm0
+    psrldq xmm0, 4
+    andps xmm0, xmm1
+    movd eax, xmm0
+    and eax, 1
 
-    add rsp, 8
-    pop rbp
     ret
 
 global addV4
@@ -124,9 +127,9 @@ dotV4:
     mulps xmm0, xmm2
     mulps xmm1, xmm3
     addps xmm0, xmm1
-    movq rdi, xmm0
-    shr rdi, 32
-    movd xmm1, edi
+    movq rax, xmm0
+    shr rax, 32
+    movd xmm1, eax
     addss xmm0, xmm1
     ret
 
@@ -435,6 +438,592 @@ tick:
     movups [rdi], xmm0
     ret
 
+global equM4
+equM4:
+    lea rax, [epsilon]
+    movups xmm3, [rax]
+    mov rax, ~((1 << 63) + (1 << 31))
+    movq xmm4, rax
+    movq xmm5, rax
+    pslldq xmm4, 8
+    por xmm4, xmm5
+
+    movups xmm0, [rdi]
+    movups xmm1, [rsi]
+    subps xmm0, xmm1
+    pand xmm0, xmm4
+    cmpleps xmm0, xmm3
+
+    movups xmm1, [rdi + 16]
+    movups xmm2, [rsi + 16]
+    subps xmm1, xmm2
+    pand xmm1, xmm4
+    cmpleps xmm1, xmm3
+    andps xmm0, xmm1
+
+    movups xmm1, [rdi + 32]
+    movups xmm2, [rsi + 32]
+    subps xmm1, xmm2
+    pand xmm1, xmm4
+    cmpleps xmm1, xmm3
+    andps xmm0, xmm1
+
+    movups xmm1, [rdi + 48]
+    movups xmm2, [rsi + 48]
+    subps xmm1, xmm2
+    pand xmm1, xmm4
+    cmpleps xmm1, xmm3
+    andps xmm0, xmm1
+
+    movups xmm1, xmm0
+    psrldq xmm1, 8
+    andps xmm0, xmm1
+    movups xmm1, xmm0
+    psrldq xmm1, 4
+    andps xmm0, xmm1
+
+    movq rax, xmm0
+    and rax, 1
+
+    ret
+
+global mulM4
+; rdi: a
+; rsi: b
+; rdx: out
+mulM4:
+    xor r9, r9 ; row
+    xor r10, r10 ; col
+
+    xor rcx, rcx
+.loop:
+    cmp rcx, 64
+    jge .loop_end
+
+    mov r9, rcx
+    and r9, 0b11110000
+    mov r10, rcx
+    and r10, 0b00001111
+
+    pxor xmm0, xmm0
+
+    movd xmm1, [rdi + r9]
+    movd xmm2, [rsi + r10]
+    mulss xmm1, xmm2
+    addss xmm0, xmm1
+    movd xmm1, [rdi + r9 + 4]
+    movd xmm2, [rsi + r10 + 16]
+    mulss xmm1, xmm2
+    addss xmm0, xmm1
+    movd xmm1, [rdi + r9 + 8]
+    movd xmm2, [rsi + r10 + 32]
+    mulss xmm1, xmm2
+    addss xmm0, xmm1
+    movd xmm1, [rdi + r9 + 12]
+    movd xmm2, [rsi + r10 + 48]
+    mulss xmm1, xmm2
+    addss xmm0, xmm1
+
+    movd [rdx + rcx], xmm0
+    add rcx, 4
+    jmp .loop
+.loop_end:
+
+    ret
+
+global mulM4V4
+mulM4V4:
+    movq xmm2, xmm1
+    pslldq xmm2, 8
+    orps xmm2, xmm0
+    movups xmm3, xmm2
+
+    pxor xmm0, xmm0
+    pxor xmm1, xmm1
+
+    movups xmm4, [rdi + 16]
+    mulps xmm3, xmm4
+    addss xmm0, xmm3
+    psrldq xmm3, 4
+    addss xmm0, xmm3
+    psrldq xmm3, 4
+    addss xmm0, xmm3
+    psrldq xmm3, 4
+    addss xmm0, xmm3
+
+    pslldq xmm0, 4
+
+    movups xmm4, [rdi]
+    movups xmm3, xmm2
+    mulps xmm3, xmm4
+    addss xmm0, xmm3
+    psrldq xmm3, 4
+    addss xmm0, xmm3
+    psrldq xmm3, 4
+    addss xmm0, xmm3
+    psrldq xmm3, 4
+    addss xmm0, xmm3
+
+    movups xmm4, [rdi + 48]
+    movups xmm3, xmm2
+    mulps xmm3, xmm4
+    addss xmm1, xmm3
+    psrldq xmm3, 4
+    addss xmm1, xmm3
+    psrldq xmm3, 4
+    addss xmm1, xmm3
+    psrldq xmm3, 4
+    addss xmm1, xmm3
+
+    pslldq xmm1, 4
+
+    movups xmm4, [rdi + 32]
+    movups xmm3, xmm2
+    mulps xmm3, xmm4
+    addss xmm1, xmm3
+    psrldq xmm3, 4
+    addss xmm1, xmm3
+    psrldq xmm3, 4
+    addss xmm1, xmm3
+    psrldq xmm3, 4
+    addss xmm1, xmm3
+
+    ret
+
+global transposeM4
+transposeM4:
+    xor rax, rax
+    xor rcx, rcx
+
+.loop:
+    cmp rcx, 16
+    jae .loop_end
+
+    mov eax, [rdi + rcx + 0]
+    mov [rsi + rcx * 4 + 0], eax
+    mov eax, [rdi + rcx + 16]
+    mov [rsi + rcx * 4 + 4], eax
+    mov eax, [rdi + rcx + 32]
+    mov [rsi + rcx * 4 + 8], eax
+    mov eax, [rdi + rcx + 48]
+    mov [rsi + rcx * 4 + 12], eax
+
+    add rcx, 4
+    jmp .loop
+.loop_end:
+
+    ret
+
+global subMat4
+; rdi - row
+; rsi - col
+; rdx - &inMat
+; rcx - &outMat
+subMat4:
+    shl rdi, 4
+    shl rsi, 2
+    mov r9, rcx
+    add r9, 4 * 3 * 3
+    xor rax, rax
+.loop:
+    cmp rcx, r9
+    jae .loop_end
+    mov r8, rax
+    and r8, ~0x0f
+    cmp r8, rdi
+    je .skip_loop
+    mov r8, rax
+    and r8, 0x0f
+    cmp r8, rsi
+    je .skip_loop
+
+    movd xmm0, [rdx + rax]
+    movd [rcx], xmm0
+    add rcx, 4
+
+.skip_loop:
+    add rax, 4
+    jmp .loop
+.loop_end:
+
+    ret
+
+global subMat3
+; rdi - row
+; rsi - col
+; rdx - &inMat
+; rcx - &outMat
+subMat3:
+    shl rdi, 2
+    shl rsi, 2
+    mov r10, rcx
+    add r10, 16
+
+    xor r8, r8
+.row_loop:
+    cmp r8, 12
+    jae .done
+    cmp r8, rdi
+    je .row_loop_skip
+
+    xor r9, r9
+    .col_loop:
+    cmp r9, 12
+    jae .col_loop_end
+    cmp r9, rsi
+    je .col_loop_skip
+
+    lea rax, [0 + r8 * 2 + r8]
+    add rax, r9
+    movd xmm0, [rdx + rax]
+    movd [rcx], xmm0
+    add rcx, 4
+    cmp rcx, r10
+    jae .done
+
+    .col_loop_skip:
+    add r9, 4
+    jmp .col_loop
+    .col_loop_end:
+
+.row_loop_skip:
+    add r8, 4
+    jmp .row_loop
+.done:
+    ret
+
+global determinantM2
+determinantM2:
+    movd xmm0, [rdi]
+    movd xmm1, [rdi + 12]
+    mulss xmm0, xmm1
+    movd xmm1, [rdi + 4]
+    movd xmm2, [rdi + 8]
+    mulss xmm1, xmm2
+    subss xmm0, xmm1
+    ret
+
+global determinantM3
+determinantM3:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 28
+
+    mov [rbp - 8], rdi
+
+    xor rdi, rdi
+    xor rsi, rsi
+    mov rdx, [rbp - 8]
+    lea rcx, [rbp - 24]
+    call subMat3
+    lea rdi, [rbp - 24]
+    call determinantM2
+    mov rax, [rbp - 8]
+    movd xmm1, [rax]
+    mulss xmm0, xmm1
+    movd [rbp - 28], xmm0
+
+    xor rdi, rdi
+    mov rsi, 1
+    mov rdx, [rbp - 8]
+    lea rcx, [rbp - 24]
+    call subMat3
+    lea rdi, [rbp - 24]
+    call determinantM2
+    mov rax, [rbp - 8]
+    movd xmm1, [rax + 4]
+    mulss xmm1, xmm0
+    movd xmm0, [rbp - 28]
+    subss xmm0, xmm1
+    movd [rbp - 28], xmm0
+
+    xor rdi, rdi
+    mov rsi, 2
+    mov rdx, [rbp - 8]
+    lea rcx, [rbp - 24]
+    call subMat3
+    lea rdi, [rbp - 24]
+    call determinantM2
+    mov rax, [rbp - 8]
+    movd xmm1, [rax + 8]
+    mulss xmm1, xmm0
+    movd xmm0, [rbp - 28]
+    addss xmm0, xmm1
+
+    add rsp, 28
+    pop rbp
+    ret
+
+global determinantM4
+determinantM4:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 48
+
+    mov [rbp - 8], rdi
+    xor rdi, rdi
+    xor rsi, rsi
+    mov rdx, [rbp - 8]
+    lea rcx, [rbp - 44]
+    call subMat4
+    lea rdi, [rbp - 44]
+    call determinantM3
+    mov rax, [rbp - 8]
+    movd xmm1, [rax]
+    mulss xmm1, xmm0
+    movd [rbp - 48], xmm1
+
+    xor rdi, rdi
+    mov rsi, 1
+    mov rdx, [rbp - 8]
+    lea rcx, [rbp - 44]
+    call subMat4
+    lea rdi, [rbp - 44]
+    call determinantM3
+    mov rax, [rbp - 8]
+    movd xmm1, [rax + 4]
+    mulss xmm1, xmm0
+    movd xmm0, [rbp - 48]
+    subss xmm0, xmm1
+    movd [rbp - 48], xmm0
+
+    xor rdi, rdi
+    mov rsi, 2
+    mov rdx, [rbp - 8]
+    lea rcx, [rbp - 44]
+    call subMat4
+    lea rdi, [rbp - 44]
+    call determinantM3
+    mov rax, [rbp - 8]
+    movd xmm1, [rax + 8]
+    mulss xmm1, xmm0
+    movd xmm0, [rbp - 48]
+    addss xmm0, xmm1
+    movd [rbp - 48], xmm0
+
+    xor rdi, rdi
+    mov rsi, 3
+    mov rdx, [rbp - 8]
+    lea rcx, [rbp - 44]
+    call subMat4
+    lea rdi, [rbp - 44]
+    call determinantM3
+    mov rax, [rbp - 8]
+    movd xmm1, [rax + 12]
+    mulss xmm1, xmm0
+    movd xmm0, [rbp - 48]
+    subss xmm0, xmm1
+
+    add rsp, 48
+    pop rbp
+    ret
+
+global inverseM4
+; rdi: &inMat
+; rsi: &outMat
+inverseM4:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 20
+
+    mov [rbp - 8], rdi
+    mov [rbp - 16], rsi
+
+    call determinantM4
+    ptest xmm0, xmm0
+    jz .not_invertible
+    movd [rbp - 20], xmm0
+
+    xor rdi, rdi
+.row_loop:
+    cmp rdi, 4
+    jae .row_loop_end
+    xor rsi, rsi
+    .col_loop:
+        cmp rsi, 4
+        jae .col_loop_end
+
+        push rdi
+        push rsi
+        mov rdx, [rbp - 8]
+        call cofactorM4
+        pop rsi
+        pop rdi
+        movd xmm1, [rbp - 20]
+        divss xmm0, xmm1
+        mov rax, rsi
+        shl rax, 2
+        add rax, rdi
+        mov rcx, [rbp - 16]
+        movd [rcx + rax * 4], xmm0
+
+        inc rsi
+        jmp .col_loop
+    .col_loop_end:
+
+    inc rdi
+    jmp .row_loop
+.row_loop_end:
+
+    mov rax, 0
+    mov rsp, rbp
+    pop rbp
+    ret
+
+.not_invertible:
+    mov rax, -1
+    mov rsp, rbp
+    pop rbp
+    ret
+
+global cofactorM4
+cofactorM4:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 40
+
+    mov rax, rdi
+    add rax, rsi
+    test rax, 0x01
+    mov eax, 0
+    mov ecx, (1 << 31)
+    cmovnz eax, ecx
+    mov [rbp - 40], eax
+
+    lea rcx, [rbp - 36]
+    call subMat4
+    lea rdi, [rbp - 36]
+    call determinantM3
+
+    movd xmm1, [rbp - 40]
+    pxor xmm0, xmm1
+
+    mov rsp, rbp
+    pop rbp
+    ret
+
+global translation
+; rdi = &outMat
+; xmm0 = x
+; xmm1 = y
+; xmm2 = z
+translation:
+    pslldq xmm0, 12
+    pslldq xmm1, 12
+    pslldq xmm2, 12
+    pxor xmm3, xmm3
+    mov eax, __float32__(1.0)
+    movd xmm3, eax
+    por xmm0, xmm3
+    pslldq xmm3, 4
+    por xmm1, xmm3
+    pslldq xmm3, 4
+    por xmm2, xmm3
+    pslldq xmm3, 4
+    movups [rdi], xmm0
+    movups [rdi + 16], xmm1
+    movups [rdi + 32], xmm2
+    movups [rdi + 48], xmm3
+    ret
+
+global scaling
+; rdi = &outMat
+; xmm0 = x
+; xmm1 = y
+; xmm2 = z
+scaling:
+    pxor xmm3, xmm3
+    movups [rdi], xmm3
+    movups [rdi + 16], xmm3
+    movups [rdi + 32], xmm3
+    movups [rdi + 48], xmm3
+    movd [rdi], xmm0
+    movd [rdi + 20], xmm1
+    movd [rdi + 40], xmm2
+    mov dword[rdi + 60], __float32__(1.0)
+    ret
+
+global rotation_x
+; rdi = &outMat
+; xmm0 = radians
+rotation_x:
+    sub rsp, 4
+
+    movd [rsp], xmm0
+    fld dword[rsp]
+    fsincos
+
+    pxor xmm1, xmm1
+    movups [rdi], xmm1
+    movups [rdi + 16], xmm1
+    movups [rdi + 32], xmm1
+    movups [rdi + 48], xmm1
+    mov dword[rdi], __float32__(1.0)
+    fst dword[rdi + 20] ; cos
+    fstp dword[rdi + 40] ; cos
+    fst dword[rdi + 36] ; sin
+    fldz
+    fsubrp
+    fstp dword[rdi + 24] ; -sin
+    mov dword[rdi + 60], __float32__(1.0)
+
+    add rsp, 4
+    ret
+
+global rotation_y
+; rdi = &outMat
+; xmm0 = radians
+rotation_y:
+    sub rsp, 4
+
+    movd [rsp], xmm0
+    fld dword[rsp]
+    fsincos
+
+    pxor xmm1, xmm1
+    movups [rdi], xmm1
+    movups [rdi + 16], xmm1
+    movups [rdi + 32], xmm1
+    movups [rdi + 48], xmm1
+    mov dword[rdi + 20], __float32__(1.0)
+    mov dword[rdi + 60], __float32__(1.0)
+    fst dword[rdi] ; cos
+    fstp dword[rdi + 40] ; cos
+    fst dword[rdi + 8] ; sin
+    fldz
+    fsubrp
+    fstp dword[rdi + 32] ; -sin
+
+    add rsp, 4
+    ret
+
+global rotation_z
+; rdi = &outMat
+; xmm0 = radians
+rotation_z:
+    sub rsp, 4
+
+    movd [rsp], xmm0
+    fld dword[rsp]
+    fsincos
+
+    pxor xmm1, xmm1
+    movups [rdi], xmm1
+    movups [rdi + 16], xmm1
+    movups [rdi + 32], xmm1
+    movups [rdi + 48], xmm1
+    mov dword[rdi + 40], __float32__(1.0)
+    mov dword[rdi + 60], __float32__(1.0)
+    fst dword[rdi] ; cos
+    fstp dword[rdi + 20] ; cos
+    fst dword[rdi + 16] ; sin
+    fldz
+    fsubrp
+    fstp dword[rdi + 4] ; -sin
+
+    add rsp, 4
+    ret
+
 section .data
 env: dd 0.0, 0.0, 0.0, 0.0 ; wind
      dd 0.0, -1.0, 0.0, 0.0 ; gravity
@@ -444,3 +1033,10 @@ proj:
 white: dd 1.0, 1.0, 1.0
 black: dd 0.0, 0.0, 0.0
 time_factor: times 4 dd 0.1
+
+global identM4
+identM4:
+    dd 1.0, 0.0, 0.0, 0.0
+    dd 0.0, 1.0, 0.0, 0.0
+    dd 0.0, 0.0, 1.0, 0.0
+    dd 0.0, 0.0, 0.0, 1.0

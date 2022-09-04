@@ -1,107 +1,53 @@
 const std = @import("std");
+const lib = @import("lib.zig");
 
-const V3 = extern struct {
-    r: f32,
-    g: f32,
-    b: f32,
-};
-
-const Canvas = extern struct {
-    w: usize,
-    h: usize,
-    data: [*]V3,
-};
+const M4 = lib.M4;
+const M3 = lib.M3;
+const V4 = lib.V4;
+const Environment = lib.Environment;
+const Projectile = lib.Projectile;
 
 extern const epsilon: f32;
 
-extern fn equV4(a: V4, b: V4) bool;
-extern fn addV4(a: V4, b: V4) V4;
-extern fn subV4(a: V4, b: V4) V4;
-extern fn negV4(v: V4) V4;
-extern fn mulV4(a: V4, b: V4) V4;
-extern fn mulV4Scalar(v: V4, s: f32) V4;
-extern fn divV4(a: V4, b: V4) V4;
-extern fn divV4Scalar(v: V4, s: f32) V4;
-extern fn magV4(v: V4) f32;
-extern fn normV4(v: V4) V4;
-extern fn dotV4(a: V4, b: V4) f32;
-extern fn cross(a: V4, b: V4) V4;
-extern fn createCanvas(width: usize, height: usize) Canvas;
-extern fn destroyCanvas(canvas: *Canvas) void;
-extern fn writePixel(canvas: *Canvas, x: isize, y: isize, color: V3) void;
-extern fn printCanvasPPM(canvas: *Canvas) void;
-
-extern fn doPrint() void;
-extern fn doSim() void;
-
-const V4 = extern struct {
-    x: f32,
-    y: f32,
-    z: f32,
-    w: f32,
-};
-
-const Environment = extern struct {
-    wind: V4,
-    gravity: V4,
-};
-
-const Projectile = extern struct {
-    position: V4,
-    velocity: V4,
-};
-
-pub fn main() void {
-    doSim();
-    const env = Environment{
-        .wind = V4{
-            .x = 0.0,
-            .y = 0.0,
-            .z = 0.0,
-            .w = 0.0,
-        },
-        .gravity = V4{
-            .x = 0.0,
-            .y = -0.1,
-            .z = 0.0,
-            .w = 0.0,
-        },
+pub fn main() !void {
+    const m: M4 = [4][4]f32{
+        [4]f32{-5, 2, 6, -8},
+        [4]f32{1, -5, 1, 8},
+        [4]f32{7, 7, -6, -7},
+        [4]f32{1, -3, 7, 4},
     };
+    var out: M4 = undefined;
+    std.debug.print("{}\n", .{lib.cofactorM4(2, 3, &m)});
+    std.debug.print("{}\n", .{lib.cofactorM4(3, 2, &m)});
 
-    var proj = Projectile{
-        .position = V4{
-            .x = 0.0,
-            .y = 10.0,
-            .z = 0.0,
-            .w = 0.0,
-        },
-        .velocity = V4{
-            .x = 1.0,
-            .y = 3.0,
-            .z = 0.0,
-            .w = 0.0,
-        },
-    };
+    // lib.translation(1, 2, 3, &out);
+    lib.rotation_x(3.5, &out);
 
-    proj = tick2(env, proj);
+    var p = lib.makeV4(1, 2, 3, 1);
+    var v = lib.makeV4(1, 2, 3, 0);
+    _ = lib.equV4(p, v);
+    std.debug.print("{}\n", .{p});
+    std.debug.print("{}\n", .{v});
+    p = lib.mulM4V4(&out, p);
+    v = lib.mulM4V4(&out, v);
+    std.debug.print("{}\n", .{p});
+    std.debug.print("{}\n", .{v});
 
-    // var canvas = createCanvas(80, 60);
-
-    // while (proj.position.y > 0.0) : (proj = tick(env, proj)) {
-    //     const white = V3{ .r = 1, .g = 1, .b = 1 };
-    //     const canvas_x = @floatToInt(isize, proj.position.x);
-    //     const canvas_y = canvas.w - @floatToInt(isize, proj.position.y);
-    //     writePixel(&canvas, canvas_x, canvas_y, white);
-    // }
-
-    // printCanvasPPM(&canvas);
-    // destroyCanvas(&canvas);
+    if (lib.inverseM4(&m, &out) >= 0) {
+        for (out) |row| {
+            for (row) |col| {
+                std.debug.print("{}\n", .{col});
+            }
+        }
+    } else {
+        std.debug.print("not invertible\n", .{});
+    }
 }
 
 export fn tick2(env: Environment, proj: Projectile) Projectile {
     var newProj = proj;
-    newProj.velocity = addV4(newProj.velocity, env.gravity);
-    newProj.velocity = addV4(newProj.velocity, env.wind);
-    newProj.position = addV4(newProj.position, newProj.velocity);
+    newProj.velocity = lib.addV4(newProj.velocity, env.gravity);
+    newProj.velocity = lib.addV4(newProj.velocity, env.wind);
+    newProj.position = lib.addV4(newProj.position, newProj.velocity);
     return newProj;
 }
