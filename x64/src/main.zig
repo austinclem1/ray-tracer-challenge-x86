@@ -21,7 +21,8 @@ pub fn main() !void {
     std.debug.print("{}\n", .{lib.cofactorM4(3, 2, &m)});
 
     // lib.translation(1, 2, 3, &out);
-    lib.rotation_x(3.5, &out);
+    // lib.rotation_x(3.5, &out);
+    lib.shearing(1, 2, 3, 4, 5, 6, &out);
 
     var p = lib.makeV4(1, 2, 3, 1);
     var v = lib.makeV4(1, 2, 3, 0);

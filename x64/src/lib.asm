@@ -1024,6 +1024,30 @@ rotation_z:
     add rsp, 4
     ret
 
+global shearing
+shearing:
+    mov dword[rdi], __float32__(1.0)
+    movd [rdi + 4], xmm0
+    movd [rdi + 8], xmm1
+    mov dword[rdi + 12], __float32__(0.0)
+
+    movd [rdi + 16], xmm2
+    mov dword[rdi + 20], __float32__(1.0)
+    movd [rdi + 24], xmm3
+    mov dword[rdi + 28], __float32__(0.0)
+
+    movd [rdi + 32], xmm4
+    movd [rdi + 36], xmm5
+    mov dword[rdi + 40], __float32__(1.0)
+    mov dword[rdi + 44], __float32__(0.0)
+
+    mov dword[rdi + 48], __float32__(0.0)
+    mov dword[rdi + 52], __float32__(0.0)
+    mov dword[rdi + 56], __float32__(0.0)
+    mov dword[rdi + 60], __float32__(1.0)
+
+    ret
+
 section .data
 env: dd 0.0, 0.0, 0.0, 0.0 ; wind
      dd 0.0, -1.0, 0.0, 0.0 ; gravity

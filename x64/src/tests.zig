@@ -344,9 +344,46 @@ test "rotation" {
 
 test "shearing" {
     var transform: M4 = undefined;
-    lib.shearing(1, 0, 0, 0, 0, 0, &transform);
-    const p1 = lib.makeV4(2, 3, 4, 1);
-    const p2 = lib.mulM4V4(&transform, p1);
-    const expected_p2 = lib.makeV4(5, 3, 4, 1);
-    try std.testing.expect(lib.equV4(p2, expected_p2));
+    {
+        lib.shearing(1, 0, 0, 0, 0, 0, &transform);
+        const p1 = lib.makeV4(2, 3, 4, 1);
+        const p2 = lib.mulM4V4(&transform, p1);
+        const expected_p2 = lib.makeV4(5, 3, 4, 1);
+        try std.testing.expect(lib.equV4(p2, expected_p2));
+    }
+    {
+        lib.shearing(0, 1, 0, 0, 0, 0, &transform);
+        const p1 = lib.makeV4(2, 3, 4, 1);
+        const p2 = lib.mulM4V4(&transform, p1);
+        const expected_p2 = lib.makeV4(6, 3, 4, 1);
+        try std.testing.expect(lib.equV4(p2, expected_p2));
+    }
+    {
+        lib.shearing(0, 0, 1, 0, 0, 0, &transform);
+        const p1 = lib.makeV4(2, 3, 4, 1);
+        const p2 = lib.mulM4V4(&transform, p1);
+        const expected_p2 = lib.makeV4(2, 5, 4, 1);
+        try std.testing.expect(lib.equV4(p2, expected_p2));
+    }
+    {
+        lib.shearing(0, 0, 0, 1, 0, 0, &transform);
+        const p1 = lib.makeV4(2, 3, 4, 1);
+        const p2 = lib.mulM4V4(&transform, p1);
+        const expected_p2 = lib.makeV4(2, 7, 4, 1);
+        try std.testing.expect(lib.equV4(p2, expected_p2));
+    }
+    {
+        lib.shearing(0, 0, 0, 0, 1, 0, &transform);
+        const p1 = lib.makeV4(2, 3, 4, 1);
+        const p2 = lib.mulM4V4(&transform, p1);
+        const expected_p2 = lib.makeV4(2, 3, 6, 1);
+        try std.testing.expect(lib.equV4(p2, expected_p2));
+    }
+    {
+        lib.shearing(0, 0, 0, 0, 0, 1, &transform);
+        const p1 = lib.makeV4(2, 3, 4, 1);
+        const p2 = lib.mulM4V4(&transform, p1);
+        const expected_p2 = lib.makeV4(2, 3, 7, 1);
+        try std.testing.expect(lib.equV4(p2, expected_p2));
+    }
 }
