@@ -4,7 +4,7 @@ section .data
 
 fmt_str: db "Hi %d %d", 10, 0
 
-epsilon: times 4 dd 1.19209289e-07
+epsilon: times 4 dd 1.19209289e-06
 neg1_sse: times 4 dd -1.0
 
 ppm_header_fmt: db "P3", 10, "%d %d", 10, "255", 10, 0
@@ -177,6 +177,11 @@ mulV3:
     ret
 
 global writePixel
+; rdi = &canvas
+; rsi = x
+; rdx = y
+; xmm0 = red, blue
+; xmm1 = green
 writePixel:
     cmp rsi, 0
     jl .end
@@ -203,6 +208,9 @@ writePixel:
     ret
 
 global createCanvas
+; rdi = &dest
+; rsi = width
+; rdx = height
 createCanvas:
     mov [rdi], rsi
     mov [rdi + 8], rdx
@@ -220,6 +228,7 @@ createCanvas:
     ret
 
 global destroyCanvas:
+; rdi = &canvas
 destroyCanvas:
     mov rdi, [rdi + 16]
     push rbx
@@ -261,6 +270,7 @@ doPrint:
     ret
 
 global printCanvasPPM
+; rdi = &canvas
 printCanvasPPM:
     push rbp
     mov rbp, rsp
@@ -532,6 +542,9 @@ mulM4:
     ret
 
 global mulM4V4
+; rdi = &matrix
+; xmm0 = (x, y)
+; xmm1 = (z, w)
 mulM4V4:
     movq xmm2, xmm1
     pslldq xmm2, 8
@@ -1046,6 +1059,78 @@ shearing:
     mov dword[rdi + 56], __float32__(0.0)
     mov dword[rdi + 60], __float32__(1.0)
 
+    ret
+
+global makeClock
+makeClock:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 224
+    ; [rbp - 24]: canvas
+    ; [rbp - 88]: transform
+    ; [rbp - 142]: m_rotate
+    ; [rbp - 206]: m_translate
+    ; [rbp - 222]: point
+
+    lea rdi, [rbp - 24]
+    mov rsi, 32
+    mov rdx, 32
+    call createCanvas
+
+    lea rdi, [rbp - 206]
+    mov eax, __float32__(16.0)
+    movd xmm0, eax
+    mov eax, __float32__(16.0)
+    movd xmm1, eax
+    mov eax, __float32__(0.0)
+    movd xmm2, eax
+    call translation
+
+    lea rdi, [rbp - 142]
+    mov eax, __float32__(-0.52359877559829887307710723054658)
+    movd xmm0, eax
+    call rotation_z
+
+    mov dword[rbp - 222], 0
+    mov dword[rbp - 218], __float32__(14.0)
+    mov dword[rbp - 214], 0
+    mov dword[rbp - 210], __float32__(1.0)
+
+    mov r9, 12
+.loop:
+    push r9
+    movq xmm0, [rbp - 222]
+    movq xmm1, [rbp - 214]
+    lea rdi, [rbp - 142]
+    call mulM4V4
+    movq [rbp - 222], xmm0
+    movq [rbp - 214], xmm1
+    lea rdi, [rbp - 206]
+    call mulM4V4
+    cvttps2dq xmm0, xmm0
+    movd esi, xmm0
+    psrldq xmm0, 4
+    movd eax, xmm0
+    mov rdx, qword[(rbp - 24) + 8]
+    sub rdx, rax
+    lea rax, [white]
+    movq xmm0, [rax]
+    movd xmm1, [rax + 8]
+    lea rdi, [rbp - 24]
+    call writePixel
+    pop r9
+
+    dec r9
+    jnz .loop
+
+    lea rdi, [rbp - 24]
+    call printCanvasPPM
+
+    lea rdi, [rbp - 24]
+    call destroyCanvas
+
+    add rsp, 224
+    pop rbp
     ret
 
 section .data

@@ -387,3 +387,31 @@ test "shearing" {
         try std.testing.expect(lib.equV4(p2, expected_p2));
     }
 }
+
+test "chaining transformations" {
+    const p1 = lib.makeV4(1, 0, 1, 1);
+    var m_rotation: M4 = undefined;
+    var m_scaling: M4 = undefined;
+    var m_translation: M4 = undefined;
+    lib.rotation_x(pi / 2.0, &m_rotation);
+    lib.scaling(5, 5, 5, &m_scaling);
+    lib.translation(10, 5, 7, &m_translation);
+
+    const p2 = lib.mulM4V4(&m_rotation, p1);
+    const p2_expected = lib.makeV4(1, -1, 0, 1);
+    const p3 = lib.mulM4V4(&m_scaling, p2);
+    const p3_expected = lib.makeV4(5, -5, 0, 1);
+    const p4 = lib.mulM4V4(&m_translation, p3);
+    const p4_expected = lib.makeV4(15, 0, 7, 1);
+
+    try std.testing.expect(lib.equV4(p2, p2_expected));
+    try std.testing.expect(lib.equV4(p3, p3_expected));
+    try std.testing.expect(lib.equV4(p4, p4_expected));
+
+    var t1: M4 = undefined;
+    var t2: M4 = undefined;
+    lib.mulM4(&m_translation, &m_scaling, &t1);
+    lib.mulM4(&t1, &m_rotation, &t2);
+    const p5 = lib.mulM4V4(&t2, p1);
+    try std.testing.expect(lib.equV4( p5, p4_expected));
+}
