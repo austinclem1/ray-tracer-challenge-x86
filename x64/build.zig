@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub fn build(b: *std.build.Builder) void {
+pub fn build(b: *std.build.Builder) !void {
     // Standard target options allows the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
     // means any target is allowed, and the default is native. Other options
@@ -40,13 +40,23 @@ pub fn build(b: *std.build.Builder) void {
         exe.install();
     }
 
-    const test_step = b.step("test", "Runs the test suite");
     {
-        const test_suite = b.addTest("src/tests.zig");
-        test_suite.linkLibrary(lib);
-        test_suite.linkLibC();
+        const fuzz_test_exe = b.addExecutable("fuzz_test_runner", "src/fuzz_test_runner.zig");
 
-        test_step.dependOn(&test_suite.step);
+        fuzz_test_exe.linkLibrary(lib);
+
+        fuzz_test_exe.setTarget(target);
+        fuzz_test_exe.setBuildMode(mode);
+        fuzz_test_exe.install();
+
+        const fuzz_test_cmd = fuzz_test_exe.run();
+        fuzz_test_cmd.step.dependOn(b.getInstallStep());
+        if (b.args) |args| {
+            fuzz_test_cmd.addArgs(args);
+        }
+
+        const fuzz_test_step = b.step("fuzz", "Run fuzz tests");
+        fuzz_test_step.dependOn(&fuzz_test_cmd.step);
     }
 
     const run_cmd = exe.run();
@@ -57,4 +67,13 @@ pub fn build(b: *std.build.Builder) void {
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
+
+    const test_step = b.step("test", "Runs the test suite");
+    {
+        const test_suite = b.addTest("src/tests.zig");
+        test_suite.linkLibrary(lib);
+        test_suite.linkLibC();
+
+        test_step.dependOn(&test_suite.step);
+    }
 }
