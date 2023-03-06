@@ -5,6 +5,7 @@ section .data
 fmt_str: db "Hi %d %d", 10, 0
 
 epsilon: times 4 dd 1.19209289e-06
+neg_epsilon: times 4 dd -1.19209289e-06
 neg1_sse: times 4 dd -1.0
 
 ppm_header_fmt: db "P3", 10, "%d %d", 10, "255", 10, 0
@@ -1092,7 +1093,7 @@ makeClock:
     call rotation_z
 
     mov dword[rbp - 222], 0
-    mov dword[rbp - 218], __float32__(14.0)
+    mov dword[rbp - 218], __float32__(15.0)
     mov dword[rbp - 214], 0
     mov dword[rbp - 210], __float32__(1.0)
 
@@ -1133,6 +1134,126 @@ makeClock:
     pop rbp
     ret
 
+global rayAt
+; rdi = &ray
+; xmm0 = t
+rayAt:
+    push rbp
+    mov rbp, rsp
+    movups xmm2, xmm0
+    movq xmm0, [rdi + 16]
+    movq xmm1, [rdi + 24]
+    push rdi
+    call mulV4Scalar
+    pop rdi
+
+    movq xmm2, [rdi]
+    movq xmm3, [rdi + 8]
+
+    call addV4
+
+    mov rsp, rbp
+    pop rbp
+    ret
+
+global sphere
+; rdi = &sphere_count
+; returns eax = new sphere id
+sphere:
+    mov eax, [rdi]
+    inc dword [rdi]
+    ret
+
+global intersectSphere
+; edi = sphere id
+; rsi = &ray
+; rdx = &out_intersections ([2]f32)
+; rax = did_intersect: bool
+intersectSphere:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 48
+    mov dword [rbp - 4], edi
+    mov qword [rbp - 12], rsi
+    mov qword [rbp - 20], rdx
+
+    movups xmm0, [rsi]
+    lea rax, [origin_point]
+    movups xmm1, [rax]
+    subps xmm0, xmm1
+    movups [rbp - 36], xmm0 ; ray to sphere vector
+
+    movq xmm0, [rsi + 16]
+    movq xmm1, [rsi + 24]
+    movq xmm2, xmm0
+    movq xmm3, xmm1
+    call dotV4
+    movd [rbp - 40], xmm0
+
+    movq xmm0, [rsi + 16]
+    movq xmm1, [rsi + 24]
+    movq xmm2, [rbp - 36]
+    movq xmm3, [rbp - 28]
+    call dotV4
+    addss xmm0, xmm0
+    movd [rbp - 44], xmm0
+
+    movq xmm0, [rbp - 36]
+    movq xmm1, [rbp - 28]
+    movq xmm2, xmm0
+    movq xmm3, xmm1
+    call dotV4
+    mov eax, __float32__(1.0)
+    movd xmm1, eax
+    subss xmm0, xmm1
+    movd [rbp - 48], xmm0
+
+    movd xmm0, [rbp - 44]
+    mulss xmm0, xmm0
+
+    mov eax, __float32__(4.0)
+    movd xmm1, eax
+    movd xmm2, [rbp - 40]
+    mulss xmm1, xmm2
+    movd xmm2, [rbp - 48]
+    mulss xmm1, xmm2
+
+    subss xmm0, xmm1
+    movups xmm1, xmm0
+
+    lea rax, [epsilon]
+    movd xmm2, [rax]
+    mov eax, 1 << 31
+    movd xmm3, eax
+    orps xmm2, xmm3
+    mov rax, 0
+    comiss xmm1, xmm2
+    jb .done
+
+    mov eax, 0
+    movd xmm1, eax
+    subss xmm1, [rbp - 44]
+    movups xmm2, xmm1
+    sqrtss xmm0, xmm0
+    subss xmm1, xmm0
+    addss xmm2, xmm0
+    movd xmm3, [rbp - 40]
+    addss xmm3, xmm3
+    divss xmm1, xmm3
+    divss xmm2, xmm3
+
+    mov rdx, [rbp - 20]
+    movd [rdx], xmm1
+    movd [rdx + 4], xmm2
+
+    mov rax, 1
+
+.done:
+
+    mov rsp, rbp
+    pop rbp
+    ret
+
 section .data
 env: dd 0.0, 0.0, 0.0, 0.0 ; wind
      dd 0.0, -1.0, 0.0, 0.0 ; gravity
@@ -1148,4 +1269,7 @@ identM4:
     dd 1.0, 0.0, 0.0, 0.0
     dd 0.0, 1.0, 0.0, 0.0
     dd 0.0, 0.0, 1.0, 0.0
+    dd 0.0, 0.0, 0.0, 1.0
+
+origin_point:
     dd 0.0, 0.0, 0.0, 1.0
